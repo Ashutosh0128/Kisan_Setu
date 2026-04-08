@@ -32,7 +32,8 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-6c))=05%#ug9_a!_jxctn
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+# Explicitly whitelist PythonAnywhere domains (along with localhost fallback)
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost,.pythonanywhere.com').split(',')
 
 
 # Application definition

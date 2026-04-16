@@ -7,66 +7,85 @@ from django.core.validators import validate_email
 from django.http import JsonResponse
 from api.models import Profile
 import json
+from django.db import IntegrityError, transaction
 
 def home(request):
     return render(request, 'index.html')
 
 def signup(request):
-    if request.method == 'POST':
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        email = data.get('email', '').strip().lower()
+        password = data.get('password')
+        full_name = data.get('name', '').strip()
+        profile_data = data.get('profile', {})
+        role = profile_data.get('role', 'farmer').lower()
+
+        # 1. Validation
+        if not email or not password:
+            return JsonResponse({'error': 'Email and password are required.'}, status=400)
+
+        # Map role values correctly and validate
+        valid_roles = ['farmer', 'owner', 'admin']
+        if role not in valid_roles:
+            return JsonResponse({'error': 'Invalid role selection.'}, status=400)
+
+        # Email format validation
         try:
-            data = json.loads(request.body)
-            email = data.get('email', '').strip().lower()
-            password = data.get('password')
-            full_name = data.get('name', '').strip()
-            profile_data = data.get('profile', {})
-            role = profile_data.get('role', 'farmer')
+            validate_email(email)
+        except ValidationError:
+            return JsonResponse({'error': 'Invalid email format.'}, status=400)
 
-            # 1. Basic validation
-            if not email or not password:
-                return JsonResponse({'error': 'Email and password are required.'}, status=400)
+        # Check duplicate user
+        if User.objects.filter(email=email).exists() or User.objects.filter(username=email).exists():
+            return JsonResponse({'error': 'A user with this email already exists.'}, status=409)
 
-            # 2. Email format validation
-            try:
-                validate_email(email)
-            except ValidationError:
-                return JsonResponse({'error': 'Invalid email format.'}, status=400)
+        # Password strength validation
+        try:
+            validate_password(password)
+        except ValidationError as e:
+            return JsonResponse({'error': ' '.join(e.messages)}, status=400)
 
-            # 3. Check duplicate user
-            if User.objects.filter(email=email).exists() or User.objects.filter(username=email).exists():
-                return JsonResponse({'error': 'A user with this email already exists.'}, status=400)
-
-            # 4. Password strength validation
-            try:
-                validate_password(password)
-            except ValidationError as e:
-                return JsonResponse({'error': ' '.join(e.messages)}, status=400)
-
-            # 5. Create user
+        # 2. User Creation (Atomically)
+        with transaction.atomic():
             # We use email as username for simplicity and unique identification
             user = User.objects.create_user(username=email, email=email, password=password)
             user.first_name = full_name
             user.save()
 
-            # 6. Update Profile role (Signal in api/models.py auto-creates the profile)
+            # Profile is auto-created via signal in api/models.py
+            # We ensure it's mapped to the correct role and approval status
             if hasattr(user, 'profile'):
                 user.profile.role = role
-                if role != 'owner':
-                    user.profile.is_approved = True
+                user.profile.is_approved = (role != 'owner')
                 user.profile.save()
             else:
                 Profile.objects.create(user=user, role=role, is_approved=(role != 'owner'))
 
-            # 7. Login immediately after successful signup
-            if role == 'owner':
-                return JsonResponse({'message': 'Registration successful! Your account is pending admin approval.', 'user': {'email': email, 'role': role}}, status=201)
+        # 3. Handle specific registration success scenarios
+        if role == 'owner':
+            return JsonResponse({
+                'message': 'Registration successful! Your account is pending admin approval.',
+                'user': {'email': email, 'role': role}
+            }, status=201)
 
-            login(request, user)
+        # Auto-login for farmers/admins
+        login(request, user)
 
-            return JsonResponse({'message': 'Registration successful!', 'user': {'email': email, 'role': role}}, status=201)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON data.'}, status=400)
-        except Exception as e:
-            return JsonResponse({'error': 'An unexpected error occurred. Please try again.'}, status=500)
+        return JsonResponse({
+            'message': 'Registration successful!',
+            'user': {'email': email, 'role': role}
+        }, status=201)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON data.'}, status=400)
+    except IntegrityError:
+        return JsonResponse({'error': 'Database error occurred. Please try again with a different email.'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': 'An unexpected error occurred during signup.'}, status=500)
     return JsonResponse({'error': 'Method not allowed.'}, status=405)
 
 def login_view(request):

@@ -24,7 +24,8 @@ function resolveImage(path) {
     if (!path) return 'https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&q=80&w=800';
     if (path.startsWith('http')) return path;
     if (path.startsWith('/media/')) return `${BACKEND_BASE}${path}`;
-    return path; // Fallback for local assets if any
+    if (path.startsWith('assets/')) return `/static/${path}`; // Added to support moved static assets
+    return path;
 }
 
 async function fetchAPI(endpoint, options = {}) {

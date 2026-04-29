@@ -22,12 +22,14 @@ from django.views.static import serve
 from . import views
 
 urlpatterns = [
-    path('admin/', admin.as_view() if hasattr(admin, 'as_view') else admin.site.urls),
+    path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
     path('signup/', views.signup, name='signup'),
     path('login/', views.login_view, name='login_view'),
     path('current-user/', views.current_user, name='current_user'),
     path('logout/', views.logout_view, name='logout_view'),
     path('', views.home, name='home'),
-    re_path(r'^(?P<path>.*\.(css|js|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot))$', serve, {'document_root': settings.BASE_DIR.parent}),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

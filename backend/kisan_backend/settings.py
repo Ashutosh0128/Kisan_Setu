@@ -30,10 +30,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-6c))=05%#ug9_a!_jxctn(z+n&9!@g%!@xoj*jjegrn)29hxea')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-# Explicitly whitelist PythonAnywhere domains (along with localhost fallback)
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost,.pythonanywhere.com').split(',')
+# Production/Deployment settings
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost,.onrender.com').split(',')
+
+# CSRF settings for production
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.onrender.com',
+    'http://localhost',
+    'http://127.0.0.1',
+]
 
 
 # Application definition
@@ -44,6 +51,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'whitenoise.runserver_nostatic', # Better dev serving
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
@@ -51,9 +59,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware', # Static file serving
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -67,10 +75,11 @@ ROOT_URLCONF = 'kisan_backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR.parent],
+        'DIRS': [BASE_DIR.parent], # Root directory for index.html
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -128,14 +137,16 @@ USE_I18N = True
 USE_TZ = True
 
 
-import os
-STATIC_URL = 'static/'
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
+# Point to the frontend folder in root
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR.parent),
+    os.path.join(BASE_DIR.parent, 'frontend'),
 ]
 
+# WhiteNoise storage for compression and caching
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -154,7 +165,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS Settings
-CORS_ALLOW_ALL_ORIGINS = True # Only for development
+CORS_ALLOW_ALL_ORIGINS = True # Set to False in real production and add origins
 
 # REST Framework Settings
 REST_FRAMEWORK = {

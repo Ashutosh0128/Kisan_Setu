@@ -22,4 +22,4 @@ services:
       - key: DEBUG
         value: "False"
       - key: ALLOWED_HOSTS
-        value: "kisan-setu-web.onrender.com"
+        value: "kisan-setu-web.onrender.com,*.onrender.com"

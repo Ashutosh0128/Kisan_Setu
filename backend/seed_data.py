@@ -11,9 +11,16 @@ from api.models import Equipment
 admin_user, _ = User.objects.get_or_create(username='admin')
 if _:
     admin_user.set_password('admin123')
+    admin_user.email = 'admin@example.com'
     admin_user.is_superuser = True
     admin_user.is_staff = True
     admin_user.save()
+    
+    # Ensure admin profile exists and has the correct role
+    if hasattr(admin_user, 'profile'):
+        admin_user.profile.role = 'admin'
+        admin_user.profile.is_approved = True
+        admin_user.profile.save()
 
 initial_data = [
     {

@@ -5,7 +5,7 @@ from .models import Profile, Equipment, Booking, ContactMessage
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
-        fields = ['role']
+        fields = ['role', 'is_approved']
 
 class UserSerializer(serializers.ModelSerializer):
     profile = ProfileSerializer()
@@ -59,6 +59,15 @@ class UserSerializer(serializers.ModelSerializer):
         Profile.objects.filter(user=user).update(**profile_data)
         
         return user
+
+class UserManagementSerializer(serializers.ModelSerializer):
+    role = serializers.CharField(source='profile.role', read_only=True)
+    is_approved = serializers.BooleanField(source='profile.is_approved', read_only=True)
+    name = serializers.CharField(source='first_name', read_only=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'name', 'role', 'is_approved']
 
 class EquipmentSerializer(serializers.ModelSerializer):
     owner_name = serializers.ReadOnlyField(source='owner.username')

@@ -4,7 +4,47 @@ from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes
 from django.contrib.auth.models import User
 from .models import Equipment, Profile, Booking, ContactMessage
-from .serializers import EquipmentSerializer, BookingSerializer, ContactMessageSerializer
+from .serializers import EquipmentSerializer, BookingSerializer, ContactMessageSerializer, UserManagementSerializer
+
+class UserListView(generics.ListAPIView):
+    serializer_class = UserManagementSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get_queryset(self):
+        if not hasattr(self.request.user, 'profile') or self.request.user.profile.role != 'admin':
+            return User.objects.none()
+        
+        status_query = self.request.query_params.get('status', 'pending')
+        if status_query == 'pending':
+            return User.objects.filter(profile__role='owner', profile__is_approved=False).order_by('-date_joined')
+        return User.objects.all().order_by('-date_joined')
+
+class ApproveUserView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def patch(self, request, pk):
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'admin':
+            return Response({"error": "Only admins can approve users"}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            user_to_approve = User.objects.get(pk=pk)
+            if hasattr(user_to_approve, 'profile'):
+                user_to_approve.profile.is_approved = True
+                user_to_approve.profile.save()
+                return Response(UserManagementSerializer(user_to_approve).data)
+            return Response({"error": "User has no profile"}, status=status.HTTP_400_BAD_REQUEST)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class UserDeleteView(generics.DestroyAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserManagementSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def perform_destroy(self, instance):
+        if not hasattr(self.request.user, 'profile') or self.request.user.profile.role != 'admin':
+            raise permissions.PermissionDenied("Only admins can delete users")
+        instance.delete()
 
 class EquipmentListCreateView(generics.ListCreateAPIView):
     serializer_class = EquipmentSerializer

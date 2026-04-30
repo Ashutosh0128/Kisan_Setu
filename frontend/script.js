@@ -613,9 +613,68 @@ async function deleteOwnerEquipment(id) {
 }
 
 async function renderAdminDashboard() {
+    renderAdminUsers();
     renderPendingApprovals();
     renderContactMessages();
     renderFullFleet();
+}
+
+async function renderAdminUsers() {
+    const content = document.getElementById('adminUsers');
+    if (!content) return;
+    try {
+        const resp = await fetchAPI('users/?status=pending');
+        if (resp && resp.ok) {
+            const users = await resp.json();
+            content.innerHTML = users.length ? '' : '<p>No pending user approvals.</p>';
+            users.forEach(u => {
+                const card = document.createElement('div');
+                card.className = 'admin-card dashboard-card';
+                card.innerHTML = `
+                    <h3>${u.name || u.username}</h3>
+                    <p><strong>Email:</strong> ${u.email}</p>
+                    <p><strong>Role:</strong> ${u.role}</p>
+                    <div class="admin-actions">
+                        <button onclick="approveUser(${u.id})" class="btn btn-primary" style="width: 100%;">Approve Owner</button>
+                        <button onclick="deleteUser(${u.id})" class="btn-delete-small" style="width: 100%; margin-top: 0.5rem;">Reject Registration</button>
+                    </div>
+                `;
+                content.appendChild(card);
+            });
+        }
+    } catch (e) {
+        console.error("User management error", e);
+    }
+}
+
+async function approveUser(id) {
+    if (!confirm("Approve this user as an Equipment Owner?")) return;
+    try {
+        const resp = await fetchAPI(`users/${id}/approve/`, { method: 'PATCH' });
+        if (resp && resp.ok) {
+            alert("User approved successfully!");
+            renderAdminUsers();
+        } else {
+            alert("Approval failed.");
+        }
+    } catch (e) {
+        console.error("User approval error", e);
+    }
+}
+
+async function deleteUser(id) {
+    if (!confirm("Reject and delete this user registration?")) return;
+    try {
+        const resp = await fetchAPI(`users/${id}/`, { method: 'DELETE' });
+        if (resp && resp.ok) {
+            alert("User registration rejected and deleted.");
+            renderAdminUsers();
+        } else {
+            alert("Delete failed.");
+        }
+    } catch (e) {
+        console.error("User delete error", e);
+    }
 }
 
 async function renderPendingApprovals() {
@@ -637,6 +696,7 @@ async function renderPendingApprovals() {
                             <input type="number" id="price-${item.id}" value="${item.price}" class="admin-input">
                             <button onclick="approveEquipment(${item.id})" class="btn btn-primary" style="padding: 0.8rem 1.2rem;">Approve</button>
                         </div>
+                        <button onclick="deleteEquipment(${item.id})" class="btn-delete-small" style="width: 100%; margin-top: 0.5rem;">Reject Listing</button>
                     </div>
                 `;
                 content.appendChild(card);
